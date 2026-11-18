@@ -1,7 +1,8 @@
 name: Measure
 
 # Installs one scenario with one variant, builds it, and records the timings as an artifact.
-#   variant: baseline (no cache) | can (cache-anything-new-action) | apt (cache-apt-pkgs-action)
+#   variant: baseline (no cache) | can (cache-anything-new-action) |
+#            apt (cache-apt-pkgs-action) | apt-scripts (the same with execute_install_scripts)
 #   phase:   install (baseline) | miss (first run of a key) | hit (second run of the same key)
 
 on:
@@ -33,7 +34,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - id: packages
-        if: inputs.variant == 'apt'
+        if: startsWith(inputs.variant, 'apt')
         run: echo "list=$(bash scripts/packages.sh "${SCENARIO}")" >> "${GITHUB_OUTPUT}"
 
       - name: Start timer
@@ -81,11 +82,12 @@ jobs:
 
       # --- awalsh128/cache-apt-pkgs-action --------------------------------------------------
       - id: apt
-        if: inputs.variant == 'apt'
+        if: startsWith(inputs.variant, 'apt')
         uses: awalsh128/cache-apt-pkgs-action@v1.6.3
         with:
           packages: ${{ steps.packages.outputs.list }}
-          version: bench-${{ inputs.key }}
+          version: bench-${{ inputs.key }}-${{ inputs.variant }}
+          execute_install_scripts: ${{ inputs.variant == 'apt-scripts' }}
 
       - name: Stop timer
         run: date +%s.%N > "${RUNNER_TEMP}/t1"

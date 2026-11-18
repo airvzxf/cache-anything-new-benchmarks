@@ -25,6 +25,8 @@ ROWS = [
     ("can", "hit", "cache-anything-new: hit"),
     ("apt", "miss", "cache-apt-pkgs: miss"),
     ("apt", "hit", "cache-apt-pkgs: hit"),
+    ("apt-scripts", "miss", "cache-apt-pkgs + scripts: miss"),
+    ("apt-scripts", "hit", "cache-apt-pkgs + scripts: hit"),
 ]
 
 
@@ -68,8 +70,8 @@ def median(values: list[float]) -> str:
 
 def table(results: list[dict], scenario: str) -> list[str]:
     lines = [
-        "| Variant | Setup (s) | Build (s) | Job (s) | Builds OK | Restored | Size |",
-        "|---|---:|---:|---:|---:|---:|---:|",
+        "| Variant | Setup (s) | apt download (s) | Build (s) | Job (s) | Builds OK | Restored | Size |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for variant, phase, label in ROWS:
         rows = [r for r in results
@@ -84,6 +86,7 @@ def table(results: list[dict], scenario: str) -> list[str]:
         sizes = sorted({r["size"] for r in valid if r["size"]})
         lines.append(
             f"| {label} | {median([r['setup_s'] for r in valid])} "
+            f"| {median([r['download_s'] for r in valid if r.get('download_s') is not None])} "
             f"| {median([r['build_s'] for r in valid])} "
             f"| {median([r['job_s'] for r in valid if r['job_s'] is not None])} "
             f"| {ok}/{len(valid)} | {restored} | {', '.join(sizes) or '–'} |"
@@ -101,7 +104,8 @@ def main() -> None:
     print(f"Runner images: {', '.join(images)}\n")
     print("Median of all repetitions. *Setup* is the time from before the install (or the")
     print("restore) to after it; *Job* is the whole job, including saving the cache in post")
-    print("steps. Hits only count when the cache was restored.\n")
+    print("steps. *apt download* is the part of the setup spent downloading packages, which")
+    print("depends on the Ubuntu mirror. Hits only count when the cache was restored.\n")
     for scenario in SCENARIOS:
         if any(r["scenario"] == scenario for r in results):
             print(f"### {scenario}\n")
