@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
   push:
     branches-ignore: [main]
+    paths-ignore: ['**.md']
 
 concurrency:
   group: benchmark
