@@ -1,0 +1,4 @@
+# A Rust service that links the system OpenSSL and generates code with protoc.
+pkg-config
+libssl-dev
+protobuf-compiler

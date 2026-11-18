@@ -1,0 +1,13 @@
+[package]
+name = "rust-sys-bench"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "AGPL-3.0-only"
+
+[dependencies]
+openssl = "0.10"
+prost = "0.13"
+
+[build-dependencies]
+prost-build = "0.13"

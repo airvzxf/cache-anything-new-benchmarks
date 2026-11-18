@@ -1,0 +1,10 @@
+# The cpp-boost project, built in a debian:13 container job (no sudo, root user).
+build-essential
+cmake
+pkg-config
+libboost-all-dev
+libsdl2-dev
+libglew-dev
+libopenal-dev
+libvorbis-dev
+libfreetype-dev

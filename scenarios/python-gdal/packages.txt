@@ -1,0 +1,4 @@
+# Python with native geospatial libraries from the distribution.
+python3-gdal
+python3-numpy
+gdal-bin

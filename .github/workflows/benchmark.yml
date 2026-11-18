@@ -1,0 +1,72 @@
+name: Benchmark
+
+# One repetition of every scenario: install without a cache, then a miss and a hit with each
+# caching action. Every run uses its own cache keys and deletes its caches at the end, so
+# repetitions never reuse each other's caches. Run it several times and aggregate the results
+# with scripts/report.py.
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+
+concurrency:
+  group: benchmark
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  first:
+    name: ${{ matrix.scenario }} · ${{ matrix.variant }} · ${{ matrix.variant == 'baseline' && 'install' || 'miss' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [small, cpp-boost, latex, python-gdal, rust-sys, cuda, debian-cpp]
+        variant: [baseline, can, apt]
+        exclude:
+          # cache-apt-pkgs-action only caches apt packages and needs sudo.
+          - { scenario: cuda, variant: apt }
+          - { scenario: debian-cpp, variant: apt }
+    uses: ./.github/workflows/_measure.yml
+    with:
+      scenario: ${{ matrix.scenario }}
+      variant: ${{ matrix.variant }}
+      phase: ${{ matrix.variant == 'baseline' && 'install' || 'miss' }}
+      key: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
+
+  second:
+    name: ${{ matrix.scenario }} · ${{ matrix.variant }} · hit
+    needs: first
+    if: ${{ !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [small, cpp-boost, latex, python-gdal, rust-sys, cuda, debian-cpp]
+        variant: [can, apt]
+        exclude:
+          - { scenario: cuda, variant: apt }
+          - { scenario: debian-cpp, variant: apt }
+    uses: ./.github/workflows/_measure.yml
+    with:
+      scenario: ${{ matrix.scenario }}
+      variant: ${{ matrix.variant }}
+      phase: hit
+      key: ${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.scenario }}
+
+  cleanup:
+    name: Delete this run's caches
+    needs: second
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      - name: Delete caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh cache list --repo "${GITHUB_REPOSITORY}" --limit 1000 --json id,key,sizeInBytes \
+            --jq '.[] | "\(.id) \(.sizeInBytes) \(.key)"'
+          gh cache delete --all --repo "${GITHUB_REPOSITORY}" || true
