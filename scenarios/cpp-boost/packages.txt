@@ -1,0 +1,10 @@
+# A C++ game-like project: the system libraries FreeOrion installs on Ubuntu.
+build-essential
+cmake
+pkg-config
+libboost-all-dev
+libsdl2-dev
+libglew-dev
+libopenal-dev
+libvorbis-dev
+libfreetype-dev

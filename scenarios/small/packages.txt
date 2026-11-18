@@ -1,0 +1,3 @@
+# A tiny install, to see where caching does not pay off.
+jq
+tree

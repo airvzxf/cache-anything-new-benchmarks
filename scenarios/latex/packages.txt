@@ -1,0 +1,6 @@
+# A XeLaTeX document with system fonts.
+texlive-xetex
+texlive-latex-recommended
+texlive-fonts-recommended
+fonts-noto-core
+poppler-utils

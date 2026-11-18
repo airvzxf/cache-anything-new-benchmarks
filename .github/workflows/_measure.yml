@@ -1,0 +1,115 @@
+name: Measure
+
+# Installs one scenario with one variant, builds it, and records the timings as an artifact.
+#   variant: baseline (no cache) | can (cache-anything-new-action) |
+#            apt (cache-apt-pkgs-action) | apt-scripts (the same with execute_install_scripts)
+#   phase:   install (baseline) | miss (first run of a key) | hit (second run of the same key)
+
+on:
+  workflow_call:
+    inputs:
+      scenario:
+        type: string
+        required: true
+      variant:
+        type: string
+        required: true
+      phase:
+        type: string
+        required: true
+      key:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    container: ${{ startsWith(inputs.scenario, 'debian-') && 'debian:13' || null }}
+    env:
+      SCENARIO: scenarios/${{ inputs.scenario }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: packages
+        if: startsWith(inputs.variant, 'apt')
+        run: echo "list=$(bash scripts/packages.sh "${SCENARIO}")" >> "${GITHUB_OUTPUT}"
+
+      - name: Start timer
+        run: date +%s.%N > "${RUNNER_TEMP}/t0"
+
+      # --- No cache -------------------------------------------------------------------------
+      - name: Install (no cache)
+        if: inputs.variant == 'baseline' && inputs.scenario != 'cuda'
+        run: bash scripts/install-apt.sh "${SCENARIO}"
+      - name: Install CUDA (no cache)
+        if: inputs.variant == 'baseline' && inputs.scenario == 'cuda'
+        uses: Jimver/cuda-toolkit@v0.2.36
+        with:
+          method: network
+          sub-packages: '["nvcc", "cudart"]'
+
+      # --- cache-anything-new-action --------------------------------------------------------
+      - id: can
+        if: inputs.variant == 'can' && inputs.scenario != 'cuda'
+        uses: airvzxf/cache-anything-new-action@v2
+        with:
+          key: bench-${{ inputs.key }}
+          run: bash scripts/install-apt.sh "scenarios/${{ inputs.scenario }}"
+      - id: can-start
+        if: inputs.variant == 'can' && inputs.scenario == 'cuda'
+        uses: airvzxf/cache-anything-new-action/start@v2
+        with:
+          key: bench-${{ inputs.key }}
+      - if: inputs.variant == 'can' && inputs.scenario == 'cuda' && steps.can-start.outputs.cache-hit != 'true'
+        uses: Jimver/cuda-toolkit@v0.2.36
+        with:
+          method: network
+          sub-packages: '["nvcc", "cudart"]'
+      - id: can-end
+        if: inputs.variant == 'can' && inputs.scenario == 'cuda'
+        uses: airvzxf/cache-anything-new-action/end@v2
+      # Jimver/cuda-toolkit adds nvcc to PATH through GITHUB_PATH, which a restore cannot
+      # bring back, so add it here for both the miss and the hit.
+      - name: Add CUDA to PATH
+        if: inputs.variant == 'can' && inputs.scenario == 'cuda'
+        run: |
+          bin="$(find /usr/local -maxdepth 2 -path '/usr/local/cuda*/bin' | sort -V | tail -n 1)"
+          echo "CUDA: ${bin}"
+          echo "${bin}" >> "${GITHUB_PATH}"
+
+      # --- awalsh128/cache-apt-pkgs-action --------------------------------------------------
+      - id: apt
+        if: startsWith(inputs.variant, 'apt')
+        uses: awalsh128/cache-apt-pkgs-action@v1.6.3
+        with:
+          packages: ${{ steps.packages.outputs.list }}
+          version: bench-${{ inputs.key }}-${{ inputs.variant }}
+          execute_install_scripts: ${{ inputs.variant == 'apt-scripts' }}
+
+      - name: Stop timer
+        run: date +%s.%N > "${RUNNER_TEMP}/t1"
+
+      - id: build
+        name: Build and test
+        continue-on-error: true
+        run: bash "${SCENARIO}/build.sh"
+
+      - name: Record result
+        if: always()
+        env:
+          SCENARIO_NAME: ${{ inputs.scenario }}
+          VARIANT: ${{ inputs.variant }}
+          PHASE: ${{ inputs.phase }}
+          HIT: ${{ steps.can.outputs.cache-hit || steps.can-start.outputs.cache-hit || steps.apt.outputs.cache-hit }}
+          SIZE: ${{ steps.can.outputs.size || steps.can-end.outputs.size }}
+          BUILD: ${{ steps.build.outcome }}
+        run: bash scripts/record.sh > "${RUNNER_TEMP}/result.json"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: result-${{ inputs.scenario }}-${{ inputs.variant }}-${{ inputs.phase }}
+          path: ${{ runner.temp }}/result.json

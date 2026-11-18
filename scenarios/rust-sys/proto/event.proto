@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package bench;
+
+message Event {
+  string name = 1;
+  bytes digest = 2;
+  uint64 size = 3;
+}
