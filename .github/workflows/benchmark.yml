@@ -14,7 +14,8 @@ on:
         default: ''
   push:
     branches-ignore: [main]
-    paths-ignore: ['**.md']
+    # Changes to the scripts that dispatch runs and aggregate them do not change the runs.
+    paths-ignore: ['**.md', 'scripts/round.sh', 'scripts/report.py']
 
 concurrency:
   group: benchmark
