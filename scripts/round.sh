@@ -10,8 +10,8 @@
 #   -r  branch to run on (default main)
 #   -o  report file (default report.md)
 #
-# Runs are dispatched one at a time because the workflow's concurrency group keeps only one
-# pending run and cancels the others. A failed run is reported and replaced, up to 2 times.
+# Runs are dispatched one at a time, so each result is checked before the next run starts. A
+# failed run is reported and replaced, up to 2 times.
 # Needs the GitHub CLI (gh), authenticated, and jq.
 set -euo pipefail
 

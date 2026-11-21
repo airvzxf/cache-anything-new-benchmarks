@@ -58,8 +58,8 @@ between runners (the cloud, the apt mirror, the image build of the day).
    scripts/round.sh -n 2 -s small -r BRANCH # a quick check of a change to the benchmark
    ```
 
-   It dispatches the **Benchmark** workflow one run at a time, because its concurrency group
-   keeps only one pending run and cancels the others. Every run uses its own cache keys and
+   It dispatches the **Benchmark** workflow one run at a time and checks each result before
+   starting the next. Every run uses its own cache keys and
    deletes its caches at the end. A failed run is replaced, up to two times.
 3. Add the round at the top of [RESULTS.md](RESULTS.md): the version and commit, the run ids,
    the findings and the tables of `report.md`. Keep the older rounds below it, and update the
