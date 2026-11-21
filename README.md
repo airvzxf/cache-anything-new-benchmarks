@@ -6,13 +6,15 @@ much time the cache saves and to check that everything still builds after a rest
 
 ## Results
 
-See [RESULTS.md](RESULTS.md). In short, with cache-anything-new v2.0.0:
+See [RESULTS.md](RESULTS.md). In short, with cache-anything-new v2.1.0:
 
 - Every restore built and passed its checks, also where cache-apt-pkgs-action breaks (LaTeX
   fonts, BLAS alternatives for GDAL).
-- A hit takes 1–14 s; a miss makes the job about 40–130 s longer than a plain install.
-- It pays off after one hit for big installs (Boost and friends, TeX Live) and not for a few
-  small packages.
+- A miss costs about the same as a plain install (a few seconds more), and a hit takes
+  1–7 s on hosted runners, so the cache pays off from the first hit: for example 85 → 22 s for
+  the C++/Boost job and 84 → 12 s for the LaTeX job.
+- Hosted `ubuntu-24.04` runners come in two variants (clouds), and each one builds its own
+  cache.
 
 ## Scenarios
 
