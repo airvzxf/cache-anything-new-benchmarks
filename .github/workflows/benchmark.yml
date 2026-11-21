@@ -7,6 +7,11 @@ name: Benchmark
 
 on:
   workflow_dispatch:
+    inputs:
+      scenarios:
+        description: Scenarios to run, as a JSON list (empty runs all of them)
+        type: string
+        default: ''
   push:
     branches-ignore: [main]
     paths-ignore: ['**.md']
@@ -24,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [small, cpp-boost, latex, python-gdal, rust-sys, cuda, debian-cpp]
+        scenario: ${{ fromJSON(inputs.scenarios || '["small", "cpp-boost", "latex", "python-gdal", "rust-sys", "cuda", "debian-cpp"]') }}
         variant: [baseline, can, apt, apt-scripts]
         exclude:
           # cache-apt-pkgs-action only caches apt packages and needs sudo.
@@ -46,7 +51,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        scenario: [small, cpp-boost, latex, python-gdal, rust-sys, cuda, debian-cpp]
+        scenario: ${{ fromJSON(inputs.scenarios || '["small", "cpp-boost", "latex", "python-gdal", "rust-sys", "cuda", "debian-cpp"]') }}
         variant: [can, apt, apt-scripts]
         exclude:
           - { scenario: cuda, variant: apt }

@@ -54,13 +54,13 @@ jobs:
       # --- cache-anything-new-action --------------------------------------------------------
       - id: can
         if: inputs.variant == 'can' && inputs.scenario != 'cuda'
-        uses: airvzxf/cache-anything-new-action@v2
+        uses: airvzxf/cache-anything-new-action@361efb781a58f58a61bf7115c7b2a12178ec5e1e # main with fanotify detection (PR #8), not released yet
         with:
           key: bench-${{ inputs.key }}
           run: bash scripts/install-apt.sh "scenarios/${{ inputs.scenario }}"
       - id: can-start
         if: inputs.variant == 'can' && inputs.scenario == 'cuda'
-        uses: airvzxf/cache-anything-new-action/start@v2
+        uses: airvzxf/cache-anything-new-action/start@361efb781a58f58a61bf7115c7b2a12178ec5e1e # main with fanotify detection (PR #8), not released yet
         with:
           key: bench-${{ inputs.key }}
       - if: inputs.variant == 'can' && inputs.scenario == 'cuda' && steps.can-start.outputs.cache-hit != 'true'
@@ -70,7 +70,7 @@ jobs:
           sub-packages: '["nvcc", "cudart"]'
       - id: can-end
         if: inputs.variant == 'can' && inputs.scenario == 'cuda'
-        uses: airvzxf/cache-anything-new-action/end@v2
+        uses: airvzxf/cache-anything-new-action/end@361efb781a58f58a61bf7115c7b2a12178ec5e1e # main with fanotify detection (PR #8), not released yet
       # Jimver/cuda-toolkit adds nvcc to PATH through GITHUB_PATH, which a restore cannot
       # bring back, so add it here for both the miss and the hit.
       - name: Add CUDA to PATH
@@ -92,10 +92,19 @@ jobs:
       - name: Stop timer
         run: date +%s.%N > "${RUNNER_TEMP}/t1"
 
+      # A failed build is a measured result, not a failure of the benchmark: report it as a
+      # warning and let the job pass.
       - id: build
         name: Build and test
-        continue-on-error: true
-        run: bash "${SCENARIO}/build.sh"
+        env:
+          LABEL: ${{ inputs.scenario }} · ${{ inputs.variant }} · ${{ inputs.phase }}
+        run: |
+          if bash "${SCENARIO}/build.sh"; then
+            echo "outcome=success" >> "${GITHUB_OUTPUT}"
+          else
+            echo "::warning title=Build failed after the setup::${LABEL}: the build or its checks failed (exit status $?). This is recorded as a result."
+            echo "outcome=failure" >> "${GITHUB_OUTPUT}"
+          fi
 
       - name: Record result
         if: always()
@@ -105,7 +114,7 @@ jobs:
           PHASE: ${{ inputs.phase }}
           HIT: ${{ steps.can.outputs.cache-hit || steps.can-start.outputs.cache-hit || steps.apt.outputs.cache-hit }}
           SIZE: ${{ steps.can.outputs.size || steps.can-end.outputs.size }}
-          BUILD: ${{ steps.build.outcome }}
+          BUILD: ${{ steps.build.outputs.outcome }}
         run: bash scripts/record.sh > "${RUNNER_TEMP}/result.json"
 
       - uses: actions/upload-artifact@v7

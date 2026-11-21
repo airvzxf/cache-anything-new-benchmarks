@@ -2,7 +2,7 @@
 """Aggregates Benchmark runs into a Markdown report.
 
 Usage:
-    scripts/report.py RUN_ID [RUN_ID ...] > RESULTS.md
+    scripts/report.py [--scenarios a,b] RUN_ID [RUN_ID ...] > report.md
 
 Needs the GitHub CLI (gh), authenticated. For every run it downloads the result artifacts
 and reads the job durations from the API, then prints the median of each measurement.
@@ -70,8 +70,9 @@ def median(values: list[float]) -> str:
 
 def table(results: list[dict], scenario: str) -> list[str]:
     lines = [
-        "| Variant | Setup (s) | apt download (s) | Build (s) | Job (s) | Builds OK | Restored | Size |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| Variant | Setup (s) | apt download (s) | Setup without download (s) | Build (s) "
+        "| Job (s) | Builds OK | Restored | Size |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for variant, phase, label in ROWS:
         rows = [r for r in results
@@ -87,6 +88,7 @@ def table(results: list[dict], scenario: str) -> list[str]:
         lines.append(
             f"| {label} | {median([r['setup_s'] for r in valid])} "
             f"| {median([r['download_s'] for r in valid if r.get('download_s') is not None])} "
+            f"| {median([r['setup_s'] - r['download_s'] for r in valid if r.get('download_s') is not None])} "
             f"| {median([r['build_s'] for r in valid])} "
             f"| {median([r['job_s'] for r in valid if r['job_s'] is not None])} "
             f"| {ok}/{len(valid)} | {restored} | {', '.join(sizes) or '–'} |"
@@ -94,23 +96,51 @@ def table(results: list[dict], scenario: str) -> list[str]:
     return lines
 
 
+def variant(result: dict) -> str:
+    """The runner image and, from the kernel, the cloud it runs on."""
+    kernel = result.get("kernel", "")
+    cloud = next((c for c in ("azure", "aws", "gcp") if kernel.endswith("-" + c)), "")
+    return f"{result['image']} ({cloud})" if cloud else result["image"]
+
+
+def downloads_by_image(results: list[dict]) -> list[str]:
+    """The apt download time of every job that ran install-apt.sh, per runner variant."""
+    lines = ["| Runner | Jobs | Median (s) | Min (s) | Max (s) |", "|---|---:|---:|---:|---:|"]
+    for image in sorted({variant(r) for r in results}):
+        values = [r["download_s"] for r in results
+                  if variant(r) == image and r.get("download_s") is not None]
+        if values:
+            lines.append(f"| {image} | {len(values)} | {median(values)} "
+                         f"| {min(values):.0f} | {max(values):.0f} |")
+    return lines
+
+
 def main() -> None:
-    run_ids = sys.argv[1:]
+    args = sys.argv[1:]
+    only = None
+    if args[:1] == ["--scenarios"] and len(args) > 1:
+        only = set(args[1].split(","))
+        args = args[2:]
+    run_ids = args
     if not run_ids:
         sys.exit(__doc__)
-    results = load(run_ids)
-    images = sorted({r["image"] for r in results})
+    results = [r for r in load(run_ids) if only is None or r["scenario"] in only]
+    images = sorted({variant(r) for r in results})
     print(f"Runs: {', '.join(run_ids)} ({len(run_ids)} repetitions)  ")
     print(f"Runner images: {', '.join(images)}\n")
     print("Median of all repetitions. *Setup* is the time from before the install (or the")
     print("restore) to after it; *Job* is the whole job, including saving the cache in post")
     print("steps. *apt download* is the part of the setup spent downloading packages, which")
-    print("depends on the Ubuntu mirror. Hits only count when the cache was restored.\n")
+    print("depends on the mirror; *Setup without download* is the rest, which is what the caching")
+    print("actions change. Hits only count when the cache was restored.\n")
     for scenario in SCENARIOS:
         if any(r["scenario"] == scenario for r in results):
             print(f"### {scenario}\n")
             print("\n".join(table(results, scenario)))
             print()
+    print("### apt download time by runner\n")
+    print("\n".join(downloads_by_image(results)))
+    print()
     by_key = defaultdict(int)
     for r in results:
         if r["build"] != "success":
