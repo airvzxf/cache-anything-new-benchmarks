@@ -96,7 +96,7 @@ def table(results: list[dict], scenario: str) -> list[str]:
     return lines
 
 
-def variant(result: dict) -> str:
+def runner(result: dict) -> str:
     """The runner image and, from the kernel, the cloud it runs on."""
     kernel = result.get("kernel", "")
     cloud = next((c for c in ("azure", "aws", "gcp") if kernel.endswith("-" + c)), "")
@@ -106,9 +106,9 @@ def variant(result: dict) -> str:
 def downloads_by_image(results: list[dict]) -> list[str]:
     """The apt download time of every job that ran install-apt.sh, per runner variant."""
     lines = ["| Runner | Jobs | Median (s) | Min (s) | Max (s) |", "|---|---:|---:|---:|---:|"]
-    for image in sorted({variant(r) for r in results}):
+    for image in sorted({runner(r) for r in results}):
         values = [r["download_s"] for r in results
-                  if variant(r) == image and r.get("download_s") is not None]
+                  if runner(r) == image and r.get("download_s") is not None]
         if values:
             lines.append(f"| {image} | {len(values)} | {median(values)} "
                          f"| {min(values):.0f} | {max(values):.0f} |")
@@ -125,7 +125,7 @@ def main() -> None:
     if not run_ids:
         sys.exit(__doc__)
     results = [r for r in load(run_ids) if only is None or r["scenario"] in only]
-    images = sorted({variant(r) for r in results})
+    images = sorted({runner(r) for r in results})
     print(f"Runs: {', '.join(run_ids)} ({len(run_ids)} repetitions)  ")
     print(f"Runner images: {', '.join(images)}\n")
     print("Median of all repetitions. *Setup* is the time from before the install (or the")
