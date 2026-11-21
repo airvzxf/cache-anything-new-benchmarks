@@ -17,9 +17,12 @@ on:
     # Changes to the scripts that dispatch runs and aggregate them do not change the runs.
     paths-ignore: ['**.md', 'scripts/round.sh', 'scripts/report.py']
 
+# Runs never overlap, so they don't compete for the repository's cache storage while they are
+# measured. They wait in order instead of being cancelled.
 concurrency:
   group: benchmark
   cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read
